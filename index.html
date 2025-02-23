@@ -1,23 +1,205 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>株取引ゲーム</title>
-    <link rel=”icon” href=“/image/favicon.ico”>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>株ゲーム</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon"> <!-- アイコンの追加 -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 20px;
+    }
+    .info {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+    canvas {
+      margin-top: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 10px;
+    }
+    #message {
+      color: red;
+      font-size: 16px;
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
-    <h1>株取引ゲーム</h1>
-    <p>所持金: <span id="balance">1000</span> コイン</p>
-    <p>現在の株価: <span id="stockPrice"></span> コイン</p>
-    <p>保有株: <span id="stocks">0</span> 株</p>
-    <p>借金: <span id="loan">0</span> コイン</p>
-    <button onclick="earnMoney()">W: お金を稼ぐ</button>
-    <button onclick="buyStock()">B: 株を買う</button>
-    <button onclick="sellStock()">S: 株を売る</button>
-    <button onclick="takeLoan()">D: 借金を借りる</button>
-    <button onclick="repayLoan()">R: 借金を返す</button>
-    <script src="script.js"></script>
+  <h1>株ゲーム</h1>
+  <p>株価の変動を追いながら取引を行い、利益を上げましょう！</p>
+
+  <!-- 株価のグラフ -->
+  <canvas id="stockChart" width="400" height="200"></canvas>
+
+  <!-- ゲーム情報 -->
+  <div class="info">
+    <p>所持金: <span id="money">10000</span>円</p>
+    <p>所持株数: <span id="stocksOwned">0</span>株</p>
+    <p>現在の株価: <span id="currentStockPrice">1000</span>円</p>
+  </div>
+
+  <div class="info">
+    <button id="buyButton">株を買う (Bキー)</button>
+    <button id="sellButton">株を売る (Sキー)</button>
+  </div>
+
+  <div id="message"></div>
+
+  <script>
+    // 初期設定
+    let stockPrice = 1000;   // 初期株価
+    let money = 10000;       // プレイヤーの所持金
+    let stocksOwned = 0;     // 所持株数
+    let stockData = [stockPrice];  // 株価データ
+    let timeLabels = ['0'];  // 時間ラベル（0分）
+
+    // クッキーからデータをロード
+    function loadDataFromCookies() {
+      const cookieMoney = getCookie('money');
+      const cookieStocksOwned = getCookie('stocksOwned');
+      const cookieStockPrice = getCookie('stockPrice');
+
+      if (cookieMoney) money = parseFloat(cookieMoney);
+      if (cookieStocksOwned) stocksOwned = parseInt(cookieStocksOwned);
+      if (cookieStockPrice) stockPrice = parseFloat(cookieStockPrice);
+    }
+
+    // クッキーにデータを保存
+    function saveDataToCookies() {
+      setCookie('money', money, 7);
+      setCookie('stocksOwned', stocksOwned, 7);
+      setCookie('stockPrice', stockPrice, 7);
+    }
+
+    // クッキーに値を設定する関数
+    function setCookie(name, value, days) {
+      const expires = new Date();
+      expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+      document.cookie = name + "=" + value + ";expires=" + expires.toUTCString() + ";path=/";
+    }
+
+    // クッキーから値を取得する関数
+    function getCookie(name) {
+      const nameEQ = name + "=";
+      const ca = document.cookie.split(';');
+      for (let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+        if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+      }
+      return null;
+    }
+
+    // グラフの設定
+    const ctx = document.getElementById('stockChart').getContext('2d');
+    const stockChart = new Chart(ctx, {
+      type: 'line',  // ラインチャート
+      data: {
+        labels: timeLabels,
+        datasets: [{
+          label: '株価',
+          data: stockData,
+          borderColor: 'rgba(75, 192, 192, 1)',
+          backgroundColor: 'rgba(75, 192, 192, 0.2)',
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: '時間 (分)',
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: '株価 (円)',
+            },
+            beginAtZero: false
+          }
+        }
+      }
+    });
+
+    // 株価を更新する関数
+    function updateStockPrice() {
+      const change = (Math.random() - 0.5) * 20; // -10円 ～ +10円 の変動
+      stockPrice += change;
+
+      // 株価のデータを追加
+      stockData.push(stockPrice);
+      timeLabels.push(timeLabels.length.toString());  // 時間を追加
+
+      // 株価とグラフを更新
+      document.getElementById('currentStockPrice').textContent = stockPrice.toFixed(2);
+      stockChart.update();
+      saveDataToCookies();  // クッキーに状態を保存
+    }
+
+    // 5秒ごとに株価を更新
+    setInterval(updateStockPrice, 5000);  // 5000ミリ秒（5秒）ごとに更新
+
+    // 株の購入
+    function buyStock() {
+      if (money >= stockPrice) {
+        let fee = stockPrice * 0.10;  // 取引手数料
+        let totalCost = stockPrice + fee;  // 株価＋手数料
+        if (money >= totalCost) {
+          money -= totalCost;  // 所持金から支払う
+          stocksOwned += 1;  // 株を1株購入
+          updateUI();  // UIを更新
+          console.log(`株を購入しました！所持株数: ${stocksOwned}, 残高: ${money}`);
+        } else {
+          alert("所持金が足りません！");
+        }
+      } else {
+        alert("株価が高すぎます！");
+      }
+    }
+
+    // 株の売却
+    function sellStock() {
+      if (stocksOwned > 0) {
+        let fee = stockPrice * 0.10;  // 取引手数料
+        let totalEarnings = stockPrice - fee;  // 売却額－手数料
+        money += totalEarnings;  // 売却で得たお金を所持金に加算
+        stocksOwned -= 1;  // 所持株数を1減らす
+        updateUI();  // UIを更新
+        console.log(`株を売却しました！所持株数: ${stocksOwned}, 残高: ${money}`);
+      } else {
+        alert("売る株がありません！");
+      }
+    }
+
+    // UIの更新
+    function updateUI() {
+      document.getElementById('money').textContent = money.toFixed(2);
+      document.getElementById('stocksOwned').textContent = stocksOwned;
+      saveDataToCookies();  // 状態をクッキーに保存
+    }
+
+    // キー操作で株を買う/売る
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'b' || event.key === 'B') {
+        buyStock();
+      } else if (event.key === 's' || event.key === 'S') {
+        sellStock();
+      }
+    });
+
+    // ページ読み込み時にデータをロード
+    loadDataFromCookies();
+    updateUI();  // UIの初期状態を更新
+  </script>
 </body>
 </html>
