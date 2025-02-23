@@ -4,145 +4,184 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>株ゲーム</title>
-  <link rel="icon" href="favicon.ico" type="image/x-icon">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin-top: 20px;
-    }
-    .info {
-      margin-top: 20px;
-      font-size: 18px;
-    }
-    canvas {
-      margin-top: 20px;
-    }
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      margin: 10px;
-    }
-    #message {
-      color: red;
-      font-size: 16px;
-      margin-top: 10px;
-    }
-    #popup, #giftPopup {
-      display: none;
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background-color: rgba(0, 0, 0, 0.8);
-      color: white;
-      padding: 20px;
-      border-radius: 10px;
-      font-size: 20px;
-      text-align: center;
-    }
-    input {
-      padding: 10px;
-      font-size: 16px;
-      margin: 10px;
-    }
+    body { font-family: Arial, sans-serif; }
+    button { margin: 5px; }
   </style>
 </head>
 <body>
   <h1>株ゲーム</h1>
-  <p>株価の変動を追いながら取引を行い、利益を上げましょう！</p>
-
-  <!-- 株価のグラフ -->
+  <p>所持金: <span id="money">500</span>円</p>
+  <p>所持株数: <span id="stocks">0</span></p>
+  <p>株価: <span id="stockPrice">0</span>円</p>
+  <button id="work">働く</button>
+  <button id="buyStock">株を買う</button>
+  <button id="sellStock">株を売る</button>
+  <button id="borrow">借金</button>
+  <button id="repayLoan">借金返済</button>
+  <button id="saveRank">ランキングに登録</button>
+  <p>借金: <span id="loan">0</span>円</p>
+  <p>株価の推移:</p>
   <canvas id="stockChart" width="400" height="200"></canvas>
-
-  <!-- ゲーム情報 -->
-  <div class="info">
-    <p>所持金: <span id="money">500</span>円</p>
-    <p>所持株数: <span id="stocksOwned">0</span>株</p>
-    <p>現在の株価: <span id="currentStockPrice">1000</span>円</p>
-    <p>借金残高: <span id="debt">0</span></p>
-  </div>
-
-  <!-- ギフト送信フォーム -->
-  <div>
-    <h3>ギフトを送る</h3>
-    <input type="text" id="giftPassword" placeholder="パスワードを入力">
-    <input type="number" id="giftAmount" placeholder="金額を指定" min="1">
-    <button onclick="sendGift()">ギフト送信</button>
-  </div>
-
-  <!-- ギフト受け取りフォーム -->
-  <div>
-    <h3>ギフトを受け取る</h3>
-    <input type="text" id="receiveGiftPassword" placeholder="受け取るパスワードを入力">
-    <button onclick="receiveGift()">ギフト受け取り</button>
-  </div>
-
-  <!-- 株価グラフ用のスクリプト -->
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
-    // ゲーム状態
-    let stockPrice = 1000;
-    let stockHistory = [stockPrice];
-    let timeHistory = [new Date().toLocaleTimeString()];
     let money = 500;
-    let stocksOwned = 0;
-    let debt = 0;
-    let totalLoanDebt = 0;
-    let giftPassword = '1234abcd'; // ギフト送信のパスワード
-    const stockRate = 0.1; // 株売買手数料
-    const COOLDOWN_TIME = 10000; // 10秒のクールダウン
+    let stocks = 0;
+    let loan = 0;
+    let stockPrice = 100;
+    let stockHistory = [stockPrice];
+    let workCooldown = 0; // 仕事のクールダウンタイマー
+    let stockCooldown = 0; // 株売買のクールダウン
 
-    // クッキーにゲーム状態を保存
-    function saveGameState() {
-      document.cookie = `money=${money};path=/;max-age=31536000`;
-      document.cookie = `stocksOwned=${stocksOwned};path=/;max-age=31536000`;
-      document.cookie = `debt=${debt};path=/;max-age=31536000`;
-      document.cookie = `stockPrice=${stockPrice};path=/;max-age=31536000`;
-      document.cookie = `totalLoanDebt=${totalLoanDebt};path=/;max-age=31536000`;
+    // UIを更新
+    function updateInfo() {
+      document.getElementById('money').textContent = money;
+      document.getElementById('stocks').textContent = stocks;
+      document.getElementById('loan').textContent = loan;
+      document.getElementById('stockPrice').textContent = stockPrice;
+      updateStockChart();
     }
 
-    // クッキーからゲーム状態を読み込む
-    function loadGameState() {
-      const cookies = document.cookie.split(';');
-      cookies.forEach(cookie => {
-        const [key, value] = cookie.trim().split('=');
-        if (key === 'money') money = parseFloat(value);
-        if (key === 'stocksOwned') stocksOwned = parseInt(value);
-        if (key === 'debt') debt = parseFloat(value);
-        if (key === 'stockPrice') stockPrice = parseFloat(value);
-        if (key === 'totalLoanDebt') totalLoanDebt = parseFloat(value);
+    // 株価の推移グラフを更新
+    function updateStockChart() {
+      const ctx = document.getElementById('stockChart').getContext('2d');
+      const chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: Array.from({ length: stockHistory.length }, (_, i) => i),
+          datasets: [{
+            label: '株価',
+            data: stockHistory,
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 1,
+            fill: false,
+          }]
+        },
       });
     }
 
-    // ゲームの初期状態を読み込む
-    window.onload = function() {
-      loadGameState();
-      updateDisplay();
+    // 仕事ボタンでお金を増やす
+    document.getElementById('work').addEventListener('click', () => {
+      if (workCooldown > 0) {
+        alert(`仕事はクールダウン中です。${workCooldown}秒後に再度実行できます。`);
+        return;
+      }
+      workCooldown = 10; // 10秒のクールダウン
+      let earned = Math.floor(Math.random() * 1000);
+      money += earned;
+      updateInfo();
+    });
+
+    // 株を買う
+    document.getElementById('buyStock').addEventListener('click', () => {
+      if (money < stockPrice) {
+        alert("お金が足りません！");
+        return;
+      }
+      if (stockCooldown > 0) {
+        alert(`株売買はクールダウン中です。${stockCooldown}秒後に再度実行できます。`);
+        return;
+      }
+      money -= stockPrice;
+      stocks++;
+      stockCooldown = 10; // 10秒のクールダウン
+      updateInfo();
+    });
+
+    // 株を売る
+    document.getElementById('sellStock').addEventListener('click', () => {
+      if (stocks <= 0) {
+        alert("株を持っていません！");
+        return;
+      }
+      if (stockCooldown > 0) {
+        alert(`株売買はクールダウン中です。${stockCooldown}秒後に再度実行できます。`);
+        return;
+      }
+      money += stockPrice;
+      stocks--;
+      stockCooldown = 10; // 10秒のクールダウン
+      updateInfo();
+    });
+
+    // 借金をする
+    document.getElementById('borrow').addEventListener('click', () => {
+      if (loan > 0) {
+        alert("すでに借金があります！");
+        return;
+      }
+      loan = 1000;
+      money += loan;
+      updateInfo();
+    });
+
+    // 借金返済
+    document.getElementById('repayLoan').addEventListener('click', () => {
+      if (loan <= 0) {
+        alert("借金がありません！");
+        return;
+      }
+      if (money < loan) {
+        alert("お金が足りません！");
+        return;
+      }
+      money -= loan;
+      loan = 0;
+      updateInfo();
+    });
+
+    // ランキングに登録
+    document.getElementById('saveRank').addEventListener('click', () => {
+      const playerName = prompt("あなたの名前を入力してください");
+      if (playerName) {
+        saveRanking(playerName, money, stocks);
+      }
+    });
+
+    // ランキングをクッキーに保存
+    function saveRanking(name, money, stocks) {
+      let rankings = JSON.parse(getCookie("rankings") || "[]");
+
+      rankings.push({ name, money, stocks });
+      rankings.sort((a, b) => b.money - a.money); // 所持金順にソート
+      rankings = rankings.slice(0, 10); // 上位10人まで
+
+      setCookie("rankings", JSON.stringify(rankings), 30); // 30日間保存
+      alert("ランキングに登録されました!");
     }
 
-    // 株価を更新
+    // クッキーに設定
+    function setCookie(name, value, days) {
+      const expires = new Date();
+      expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
+      document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+    }
+
+    // クッキーから取得
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
+      return match ? match[2] : null;
+    }
+
+    // 株価の更新
     function updateStockPrice() {
-      stockPrice += (Math.random() - 0.5) * 100; // 株価ランダム変動
-      if (stockPrice < 0) stockPrice = 0;
+      stockPrice = Math.floor(Math.random() * 500) + 50;
       stockHistory.push(stockPrice);
-      timeHistory.push(new Date().toLocaleTimeString());
-      stockChart.update();
-      document.getElementById('currentStockPrice').textContent = stockPrice.toFixed(2);
-      saveGameState();
+      if (stockHistory.length > 20) stockHistory.shift(); // 古いデータを削除
+      updateInfo();
     }
 
-    setInterval(updateStockPrice, 1000 * 60); // 1分ごとに株価を更新
+    // 一定間隔で株価更新
+    setInterval(updateStockPrice, 60000); // 1分ごとに株価更新
 
-    // ゲーム状態の表示
-    function updateDisplay() {
-      document.getElementById('money').textContent = money.toFixed(2);
-      document.getElementById('stocksOwned').textContent = stocksOwned;
-      document.getElementById('debt').textContent = debt.toFixed(2);
-    }
+    // 一定間隔でクールダウン更新
+    setInterval(() => {
+      if (workCooldown > 0) workCooldown--;
+      if (stockCooldown > 0) stockCooldown--;
+    }, 1000);
 
-    // ゲーム進行中に状態を保存
-    setInterval(saveGameState, 5000); // 5秒ごとに状態を保存
+    updateInfo();
   </script>
 </body>
 </html>
