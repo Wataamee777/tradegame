@@ -16,3 +16,39 @@ function repayLoan() { if (balance >= 500) { loan -= 500; balance -= 500; update
 
 function updateDisplay() { document.getElementById("balance").textContent = balance; document.getElementById("stocks").textContent = stocks; document.getElementById("loan").textContent = loan; }
 
+// クッキーにデータを保存する関数
+function setCookie(name, value, days) {
+  const date = new Date();
+  date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000)); // 有効期限を設定
+  const expires = "expires=" + date.toUTCString();
+  document.cookie = name + "=" + JSON.stringify(value) + ";" + expires + ";path=/";
+}
+
+// クッキーからデータを読み込む関数
+function getCookie(name) {
+  const nameEq = name + "=";
+  const ca = document.cookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i].trim();
+    if (c.indexOf(nameEq) === 0) {
+      return JSON.parse(c.substring(nameEq.length, c.length));
+    }
+  }
+  return null; // クッキーがない場合
+}
+
+// ゲームの状態を保存する
+function saveGameState(money, stocks, loan) {
+  const gameState = {
+    money: money,
+    stocks: stocks,
+    loan: loan,
+    lastEarnedTime: new Date().toISOString(),
+  };
+  setCookie('gameState', gameState, 7); // 7日間保存
+}
+
+// ゲームの状態を読み込む
+function loadGameState() {
+  return getCookie('gameState');
+}
