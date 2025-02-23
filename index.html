@@ -78,12 +78,12 @@
   </div>
 
   <div class="info">
-    <button id="buyButton">株を買う (Bキー)</button>
-    <button id="sellButton">株を売る (Sキー)</button>
-    <button id="workButton">働く (Wキー)</button>
-    <button id="loanButton">借金 (Dキー)</button>
-    <button id="repayButton">借金返済 (Rキー)</button>
-    <button id="giftButton">ギフトを送る (Gキー)</button> <!-- ギフト送信ボタン -->
+    <button id="buyButton">株を買う</button>
+    <button id="sellButton">株を売る</button>
+    <button id="workButton">働く</button>
+    <button id="loanButton">借金</button>
+    <button id="repayButton">借金返済</button>
+    <button id="giftButton">ギフトを送る</button> <!-- ギフト送信ボタン -->
   </div>
 
   <div id="message"></div>
@@ -244,8 +244,65 @@
       saveDataToCookies();  // 状態をクッキーに保存
     }
 
-    // キー操作で株を買う/売る/働く/借金/返済
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'b' || event.key === 'B') {
-        buyStock();
-      } else if (event.key === 's' || event.key === 'S
+    // 株を買う
+    function buyStock() {
+      if (money >= stockPrice) {
+        money -= stockPrice;
+        stocksOwned++;
+        updateUI();  // UIを更新
+      } else {
+        alert("所持金が足りません！");
+      }
+    }
+
+    // 株を売る
+    function sellStock() {
+      if (stocksOwned > 0) {
+        money += stockPrice;
+        stocksOwned--;
+        updateUI();  // UIを更新
+      } else {
+        alert("株を持っていません！");
+      }
+    }
+
+    // 働く
+    function work() {
+      const earnedMoney = Math.floor(Math.random() * 1001) + 100;  // 100 ～ 1000円のランダムな額を稼ぐ
+      money += earnedMoney;
+      updateUI();  // UIを更新
+    }
+
+    // 借金
+    function borrowMoney() {
+      const loanAmount = 1000;
+      debt += loanAmount;
+      money += loanAmount;
+      updateUI();  // UIを更新
+    }
+
+    // 借金返済
+    function repayDebt() {
+      if (money >= debt) {
+        money -= debt;
+        debt = 0;
+        updateUI();  // UIを更新
+      } else {
+        alert("所持金が足りません！");
+      }
+    }
+
+    // ボタンのクリックイベント
+    document.getElementById('buyButton').addEventListener('click', buyStock);
+    document.getElementById('sellButton').addEventListener('click', sellStock);
+    document.getElementById('workButton').addEventListener('click', work);
+    document.getElementById('loanButton').addEventListener('click', borrowMoney);
+    document.getElementById('repayButton').addEventListener('click', repayDebt);
+    document.getElementById('giftButton').addEventListener('click', openGiftPopup);
+
+    // ゲーム開始時にデータを読み込む
+    loadDataFromCookies();
+    setInterval(payDividend, 86400000);  // 1日ごとに配当を支払う
+  </script>
+</body>
+</html>
