@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>株取引ゲーム</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>株取引ゲーム</h1>
+    <p>所持金: <span id="balance">1000</span> コイン</p>
+    <p>現在の株価: <span id="stockPrice"></span> コイン</p>
+    <p>保有株: <span id="stocks">0</span> 株</p>
+    <p>借金: <span id="loan">0</span> コイン</p>
+    <button onclick="earnMoney()">W: お金を稼ぐ</button>
+    <button onclick="buyStock()">B: 株を買う</button>
+    <button onclick="sellStock()">S: 株を売る</button>
+    <button onclick="takeLoan()">D: 借金を借りる</button>
+    <button onclick="repayLoan()">R: 借金を返す</button>
+    <script src="script.js"></script>
+</body>
+</html>
