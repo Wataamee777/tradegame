@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>株ゲーム</title>
-  <link rel="icon" href="favicon.ico" type="image/x-icon"> <!-- アイコンのパス -->
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
@@ -58,171 +58,91 @@
 
   <!-- ゲーム情報 -->
   <div class="info">
-    <p>所持金: <span id="money">10000</span>円</p>
+    <p>所持金: <span id="money">500</span>円</p>
     <p>所持株数: <span id="stocksOwned">0</span>株</p>
     <p>現在の株価: <span id="currentStockPrice">1000</span>円</p>
     <p>借金残高: <span id="debt">0</span></p>
   </div>
 
+  <!-- ギフト送信フォーム -->
+  <div>
+    <h3>ギフトを送る</h3>
+    <input type="text" id="giftPassword" placeholder="パスワードを入力">
+    <input type="number" id="giftAmount" placeholder="金額を指定" min="1">
+    <button onclick="sendGift()">ギフト送信</button>
+  </div>
+
+  <!-- ギフト受け取りフォーム -->
+  <div>
+    <h3>ギフトを受け取る</h3>
+    <input type="text" id="receiveGiftPassword" placeholder="受け取るパスワードを入力">
+    <button onclick="receiveGift()">ギフト受け取り</button>
+  </div>
+
   <!-- 株価グラフ用のスクリプト -->
   <script>
-    // 初期設定
+    // ゲーム状態
     let stockPrice = 1000;
-    let stockHistory = [stockPrice]; // 株価履歴
-    let timeHistory = [new Date().toLocaleTimeString()]; // 時刻履歴
-    let money = 10000;
+    let stockHistory = [stockPrice];
+    let timeHistory = [new Date().toLocaleTimeString()];
+    let money = 500;
     let stocksOwned = 0;
     let debt = 0;
     let totalLoanDebt = 0;
-    let interval = 1000 * 60; // 1分ごとに株価更新
-    let stockRate = 0.1; // 株の売買手数料
-    let loanInterestRate = 10; // 借金利子
-    let giftCode = 'gift123'; // ギフトコード
+    let giftPassword = '1234abcd'; // ギフト送信のパスワード
+    const stockRate = 0.1; // 株売買手数料
+    const COOLDOWN_TIME = 10000; // 10秒のクールダウン
 
-    // 株価のグラフ設定
-    const ctx = document.getElementById('stockChart').getContext('2d');
-    const stockChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: timeHistory,
-        datasets: [{
-          label: '株価',
-          data: stockHistory,
-          borderColor: 'rgba(75, 192, 192, 1)',
-          fill: false,
-        }]
-      },
-      options: {
-        scales: {
-          y: {
-            beginAtZero: false
-          }
-        }
-      }
-    });
+    // クッキーにゲーム状態を保存
+    function saveGameState() {
+      document.cookie = `money=${money};path=/;max-age=31536000`;
+      document.cookie = `stocksOwned=${stocksOwned};path=/;max-age=31536000`;
+      document.cookie = `debt=${debt};path=/;max-age=31536000`;
+      document.cookie = `stockPrice=${stockPrice};path=/;max-age=31536000`;
+      document.cookie = `totalLoanDebt=${totalLoanDebt};path=/;max-age=31536000`;
+    }
 
-    // 株価の更新
+    // クッキーからゲーム状態を読み込む
+    function loadGameState() {
+      const cookies = document.cookie.split(';');
+      cookies.forEach(cookie => {
+        const [key, value] = cookie.trim().split('=');
+        if (key === 'money') money = parseFloat(value);
+        if (key === 'stocksOwned') stocksOwned = parseInt(value);
+        if (key === 'debt') debt = parseFloat(value);
+        if (key === 'stockPrice') stockPrice = parseFloat(value);
+        if (key === 'totalLoanDebt') totalLoanDebt = parseFloat(value);
+      });
+    }
+
+    // ゲームの初期状態を読み込む
+    window.onload = function() {
+      loadGameState();
+      updateDisplay();
+    }
+
+    // 株価を更新
     function updateStockPrice() {
-      stockPrice += (Math.random() - 0.5) * 100; // 株価をランダムに変動
+      stockPrice += (Math.random() - 0.5) * 100; // 株価ランダム変動
       if (stockPrice < 0) stockPrice = 0;
-
       stockHistory.push(stockPrice);
       timeHistory.push(new Date().toLocaleTimeString());
-
       stockChart.update();
       document.getElementById('currentStockPrice').textContent = stockPrice.toFixed(2);
+      saveGameState();
     }
 
-    setInterval(updateStockPrice, interval);
+    setInterval(updateStockPrice, 1000 * 60); // 1分ごとに株価を更新
 
-    // 株の購入
-    function buyStock() {
-      if (money >= stockPrice * (1 + stockRate)) {
-        money -= stockPrice * (1 + stockRate);
-        stocksOwned += 1;
-        updateDisplay();
-      } else {
-        alert('所持金が不足しています');
-      }
-    }
-
-    // 株の売却
-    function sellStock() {
-      if (stocksOwned > 0) {
-        money += stockPrice * (1 - stockRate);
-        stocksOwned -= 1;
-        updateDisplay();
-      } else {
-        alert('売却する株がありません');
-      }
-    }
-
-    // 借金を取る
-    function takeLoan(amount) {
-      if (amount > 0) {
-        debt += amount;
-        totalLoanDebt += amount;
-        updateDisplay();
-      }
-    }
-
-    // 借金を返済
-    function repayLoan(amount) {
-      if (amount > 0 && debt >= amount) {
-        debt -= amount;
-        updateDisplay();
-      } else {
-        alert('返済額が不正か、借金が足りません');
-      }
-    }
-
-    // ギフトを送る
-    function sendGift() {
-      const code = prompt('ギフトコードを入力してください');
-      if (code === giftCode) {
-        alert('ギフト成功！コイン777777777777777777777777777777777777777が送られました');
-        money += 777777777777777777777777777777777777777; // ギフト
-        updateDisplay();
-      } else {
-        alert('無効なギフトコードです');
-      }
-    }
-
-    // 所持金、株数、借金残高などを更新
+    // ゲーム状態の表示
     function updateDisplay() {
       document.getElementById('money').textContent = money.toFixed(2);
       document.getElementById('stocksOwned').textContent = stocksOwned;
       document.getElementById('debt').textContent = debt.toFixed(2);
     }
 
-    // 所持金が77777.77円に達した場合、ポップアップを表示
-    function checkMoneyForPopup() {
-      if (money >= 77777.77) {
-        document.getElementById('popup').style.display = 'block';
-      }
-    }
-
-    // ポップアップを閉じる
-    function closePopup() {
-      document.getElementById('popup').style.display = 'none';
-    }
-
-    setInterval(checkMoneyForPopup, 1000); // 1秒ごとにチェック
-
-    // ギフトボタン
-    document.getElementById('giftBtn').addEventListener('click', sendGift);
-
-    // 取引ボタン
-    document.getElementById('buyBtn').addEventListener('click', buyStock);
-    document.getElementById('sellBtn').addEventListener('click', sellStock);
-
-    // 借金取引ボタン
-    document.getElementById('loanBtn').addEventListener('click', function() {
-      const loanAmount = parseFloat(prompt('借金額を入力してください'));
-      takeLoan(loanAmount);
-    });
-
-    document.getElementById('repayBtn').addEventListener('click', function() {
-      const repayAmount = parseFloat(prompt('返済額を入力してください'));
-      repayLoan(repayAmount);
-    });
-
+    // ゲーム進行中に状態を保存
+    setInterval(saveGameState, 5000); // 5秒ごとに状態を保存
   </script>
-
-  <!-- 株の取引ボタン -->
-  <button id="buyBtn">株を購入</button>
-  <button id="sellBtn">株を売却</button>
-  <button id="loanBtn">借金を取る</button>
-  <button id="repayBtn">借金を返済</button>
-
-  <!-- ギフトボタン -->
-  <button id="giftBtn">ギフトを送る</button>
-
-  <!-- ポップアップ -->
-  <div id="popup">
-    <p>おめでとうございます！特別なコインを受け取りました！</p>
-    <button onclick="closePopup()">閉じる</button>
-  </div>
-
 </body>
 </html>
