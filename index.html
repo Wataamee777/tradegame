@@ -29,6 +29,37 @@
       font-size: 16px;
       margin-top: 10px;
     }
+    #popup {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      font-size: 20px;
+      text-align: center;
+    }
+    #giftPopup {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      font-size: 20px;
+      text-align: center;
+    }
+    input {
+      padding: 10px;
+      font-size: 16px;
+      margin: 10px;
+    }
   </style>
 </head>
 <body>
@@ -52,9 +83,28 @@
     <button id="workButton">働く (Wキー)</button>
     <button id="loanButton">借金 (Dキー)</button>
     <button id="repayButton">借金返済 (Rキー)</button>
+    <button id="giftButton">ギフトを送る (Gキー)</button> <!-- ギフト送信ボタン -->
   </div>
 
   <div id="message"></div>
+
+  <!-- 配当ポップアップ -->
+  <div id="popup">
+    <p>🎉 1日の配当が支払われました！ 🎉</p>
+    <p id="dividendMessage"></p>
+    <button onclick="closePopup()">閉じる</button>
+  </div>
+
+  <!-- ギフト送信ポップアップ -->
+  <div id="giftPopup">
+    <h2>ギフトを送る</h2>
+    <p>受け取る側のパスワードを入力してください:</p>
+    <input type="text" id="recipientPassword" placeholder="パスワード">
+    <p>ギフト額を入力してください:</p>
+    <input type="number" id="giftAmount" placeholder="ギフト額">
+    <button onclick="sendGift()">ギフトを送る</button>
+    <button onclick="closeGiftPopup()">閉じる</button>
+  </div>
 
   <script>
     // 初期設定
@@ -64,6 +114,11 @@
     let debt = 0;            // 借金
     let stockData = [stockPrice];  // 株価データ
     let timeLabels = ['0'];  // 時間ラベル（0分）
+    let lastDividendTime = Date.now();  // 最後の配当の時間
+    let playerPassword = "1234";  // プレイヤーのパスワード（例）
+
+    // ギフト送信先のパスワード
+    let recipientPassword = "abcd"; // 受け取り側のパスワード（例）
 
     // クッキーからデータをロード
     function loadDataFromCookies() {
@@ -71,11 +126,13 @@
       const cookieStocksOwned = getCookie('stocksOwned');
       const cookieStockPrice = getCookie('stockPrice');
       const cookieDebt = getCookie('debt');
+      const cookieLastDividendTime = getCookie('lastDividendTime');
 
       if (cookieMoney) money = parseFloat(cookieMoney);
       if (cookieStocksOwned) stocksOwned = parseInt(cookieStocksOwned);
       if (cookieStockPrice) stockPrice = parseFloat(cookieStockPrice);
       if (cookieDebt) debt = parseFloat(cookieDebt);
+      if (cookieLastDividendTime) lastDividendTime = parseInt(cookieLastDividendTime);
     }
 
     // クッキーにデータを保存
@@ -84,6 +141,7 @@
       setCookie('stocksOwned', stocksOwned, 7);
       setCookie('stockPrice', stockPrice, 7);
       setCookie('debt', debt, 7);
+      setCookie('lastDividendTime', lastDividendTime, 7);
     }
 
     // クッキーに値を設定する関数
@@ -105,40 +163,6 @@
       return null;
     }
 
-    // グラフの設定
-    const ctx = document.getElementById('stockChart').getContext('2d');
-    const stockChart = new Chart(ctx, {
-      type: 'line',  // ラインチャート
-      data: {
-        labels: timeLabels,
-        datasets: [{
-          label: '株価',
-          data: stockData,
-          borderColor: 'rgba(75, 192, 192, 1)',
-          backgroundColor: 'rgba(75, 192, 192, 0.2)',
-          fill: true,
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: {
-          x: {
-            title: {
-              display: true,
-              text: '時間 (分)',
-            }
-          },
-          y: {
-            title: {
-              display: true,
-              text: '株価 (円)',
-            },
-            beginAtZero: false
-          }
-        }
-      }
-    });
-
     // 株価を更新する関数
     function updateStockPrice() {
       const change = (Math.random() - 0.5) * 20; // -10円 ～ +10円 の変動
@@ -157,65 +181,59 @@
     // 1分ごとに株価を更新
     setInterval(updateStockPrice, 60000);  // 60000ミリ秒（1分）ごとに更新
 
-    // 株の購入
-    function buyStock() {
-      if (money >= stockPrice) {
-        let fee = stockPrice * 0.10;  // 取引手数料
-        let totalCost = stockPrice + fee;  // 株価＋手数料
-        if (money >= totalCost) {
-          money -= totalCost;  // 所持金から支払う
-          stocksOwned += 1;  // 株を1株購入
+    // 配当の支払い
+    function payDividend() {
+      const now = Date.now();
+      const oneDay = 24 * 60 * 60 * 1000; // 1日分のミリ秒
+      if (now - lastDividendTime >= oneDay) {
+        const dividend = money * 0.01;  // 配当は所持金の1%
+        money += dividend;  // 配当を所持金に加算
+        lastDividendTime = now;  // 最後の配当時刻を更新
+        saveDataToCookies();  // クッキーに保存
+        showPopup(dividend);  // ポップアップを表示
+      }
+    }
+
+    // 配当ポップアップの表示
+    function showPopup(dividend) {
+      const message = `配当: ${dividend.toFixed(2)}円が支払われました！`;
+      document.getElementById('dividendMessage').textContent = message;
+      document.getElementById('popup').style.display = 'block';
+    }
+
+    // ポップアップを閉じる
+    function closePopup() {
+      document.getElementById('popup').style.display = 'none';
+    }
+
+    // ギフト送信ポップアップを開く
+    function openGiftPopup() {
+      document.getElementById('giftPopup').style.display = 'block';
+    }
+
+    // ギフト送信ポップアップを閉じる
+    function closeGiftPopup() {
+      document.getElementById('giftPopup').style.display = 'none';
+    }
+
+    // ギフトを送る
+    function sendGift() {
+      const recipientPasswordInput = document.getElementById('recipientPassword').value;
+      const giftAmount = parseFloat(document.getElementById('giftAmount').value);
+
+      if (recipientPasswordInput === recipientPassword) {
+        if (money >= giftAmount) {
+          money -= giftAmount;  // 送信者の所持金から減算
+          alert(`ギフト ${giftAmount}円 を送信しました！`);
           updateUI();  // UIを更新
-          console.log(`株を購入しました！所持株数: ${stocksOwned}, 残高: ${money}`);
         } else {
           alert("所持金が足りません！");
         }
       } else {
-        alert("株価が高すぎます！");
+        alert("パスワードが間違っています！");
       }
-    }
 
-    // 株の売却
-    function sellStock() {
-      if (stocksOwned > 0) {
-        let fee = stockPrice * 0.10;  // 取引手数料
-        let totalEarnings = stockPrice - fee;  // 売却額－手数料
-        money += totalEarnings;  // 売却で得たお金を所持金に加算
-        stocksOwned -= 1;  // 所持株数を1減らす
-        updateUI();  // UIを更新
-        console.log(`株を売却しました！所持株数: ${stocksOwned}, 残高: ${money}`);
-      } else {
-        alert("売る株がありません！");
-      }
-    }
-
-    // 借金をする
-    function takeLoan() {
-      const loanAmount = 5000;  // 借金額
-      debt += loanAmount;  // 借金を増やす
-      money += loanAmount;  // 所持金に借金を加算
-      updateUI();  // UIを更新
-      console.log(`借金しました！借金額: ${debt}`);
-    }
-
-    // 借金を返済する
-    function repayLoan() {
-      if (money >= debt) {
-        money -= debt;  // 借金を返済
-        debt = 0;       // 借金を0にする
-        updateUI();     // UIを更新
-        console.log(`借金を返済しました！`);
-      } else {
-        alert("所持金が足りません！");
-      }
-    }
-
-    // 労働してお金を稼ぐ
-    function work() {
-      const earnings = Math.floor(Math.random() * 901) + 100;  // 100～1000円のランダム額
-      money += earnings;
-      updateUI();  // UIを更新
-      console.log(`働いて${earnings}円稼ぎました！`);
+      closeGiftPopup();  // ギフトポップアップを閉じる
     }
 
     // UIの更新
@@ -230,20 +248,4 @@
     document.addEventListener('keydown', (event) => {
       if (event.key === 'b' || event.key === 'B') {
         buyStock();
-      } else if (event.key === 's' || event.key === 'S') {
-        sellStock();
-      } else if (event.key === 'w' || event.key === 'W') {
-        work();
-      } else if (event.key === 'd' || event.key === 'D') {
-        takeLoan();
-      } else if (event.key === 'r' || event.key === 'R') {
-        repayLoan();
-      }
-    });
-
-    // ページ読み込み時にデータをロード
-    loadDataFromCookies();
-    updateUI();  // UIの初期状態を更新
-  </script>
-</body>
-</html>
+      } else if (event.key === 's' || event.key === 'S
